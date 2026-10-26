@@ -27,7 +27,7 @@ CC = re.compile(r"Control change\s+(\d+), controller (\d+), value (\d+)")
 
 clients: set[queue.Queue] = set()
 clients_lock = threading.Lock()
-status = {"type": "status", "connected": False, "device": None}
+status = {"type": "status", "connected": None, "device": None}  # None = not checked yet
 
 
 def broadcast(event: dict) -> None:
