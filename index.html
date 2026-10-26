@@ -107,7 +107,7 @@ function hit(note, vel) {
   if (!m) { console.log("unmapped note", note, vel); return; }
   const [id, part] = m;
   const p = parts[id];
-  const v = Math.max(0.25, Math.min(1, vel / 110));   // soft hits still visible
+  const v = Math.max(0.3, Math.min(1, Math.sqrt(vel / 100)));   // sqrt curve: low-sensitivity pads still flash
   if (part === "rim") { flash(p.rim, v); flash(p.glow, v * 0.45); }
   else if (part === "bell") { flash(p.bell, v); flash(p.glow, v * 0.5, FADE_MS * 1.6); }
   else flash(p.glow, v, ["crash", "ride"].includes(id) || part === "open" ? FADE_MS * 1.8 : FADE_MS);
