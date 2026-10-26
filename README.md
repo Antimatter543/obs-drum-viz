@@ -1,6 +1,6 @@
 # drum-viz
 
-A live e-drum kit overlay for OBS. Each pad lights up when you hit it, brighter the harder you hit.
+A live e-drum kit overlay for OBS. Each pad lights up when you hit it, brighter the harder you hit. A strip along the bottom shows your APM (hits per minute) and how many times you've hit each piece this session.
 
 ![preview](docs/preview.png)
 
@@ -51,6 +51,10 @@ URL query parameters:
 | `?labels=0` | Hides the piece labels |
 | `?status=0` | Hides the "waiting for drum kit…" line |
 | `?fade=400` | Sets the fade-out time in ms (default 280) |
+| `?stats=0` | Hides the stats strip, so the kit fills the whole source |
+| `?window=10` | Sets the APM averaging window in seconds (default 5) |
+
+The stats session starts at your first hit. To reset it, refresh the browser source in OBS (right-click → Refresh).
 
 Environment variables for `server.py`:
 

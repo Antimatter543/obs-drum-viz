@@ -18,8 +18,26 @@
   .hide-labels .label { display: none; }
   .cymbal-lines { fill: none; stroke: rgba(255, 214, 120, 0.18); stroke-width: 1.5; }
 
-  #status { position: fixed; left: 0; right: 0; bottom: 6px; text-align: center; font-size: 13px;
+  #status { position: fixed; left: 0; right: 0; top: 4px; text-align: center; font-size: 13px;
             color: rgba(255, 255, 255, 0.5); text-shadow: 0 1px 2px #000; }
+
+  /* Stats strip: rolling APM + per-piece session counts */
+  .with-stats svg { height: calc(100% - 96px); }
+  #stats { position: fixed; left: 14px; right: 14px; bottom: 8px; height: 80px; box-sizing: border-box;
+           display: flex; align-items: center; gap: 22px; padding: 0 20px; border-radius: 16px;
+           background: rgba(14, 16, 22, 0.66); border: 1px solid rgba(255, 255, 255, 0.08);
+           color: #fff; font-variant-numeric: tabular-nums; }
+  #stats[hidden] { display: none; }
+  .apm { display: flex; flex-direction: column; min-width: 128px; }
+  .apm-value { font-size: 38px; font-weight: 800; line-height: 1; letter-spacing: -0.02em; }
+  .apm-value small { font-size: 13px; font-weight: 700; letter-spacing: 0.12em; margin-left: 6px; color: rgba(255,255,255,0.6); }
+  .apm-sub { font-size: 12px; color: rgba(255, 255, 255, 0.55); margin-top: 5px; }
+  .apm-sub b { color: rgba(255, 255, 255, 0.85); font-weight: 700; }
+  #counts { flex: 1; display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px 14px; }
+  .count { display: flex; align-items: center; gap: 7px; font-size: 13px; color: rgba(255, 255, 255, 0.6); white-space: nowrap; }
+  .count i { width: 9px; height: 9px; border-radius: 50%; background: var(--c); flex: none; }
+  .count b { margin-left: auto; color: #fff; font-weight: 700; }
+  .count.total b { color: #ffcf5a; }
 </style>
 </head>
 <body>
@@ -31,6 +49,13 @@
   </defs>
 </svg>
 <div id="status"></div>
+<div id="stats" hidden>
+  <div class="apm">
+    <div class="apm-value"><span id="apm">0</span><small>APM</small></div>
+    <div class="apm-sub">peak <b id="peak">0</b> · <span id="clock">0:00</span></div>
+  </div>
+  <div id="counts"></div>
+</div>
 
 <script>
 // ---- Kit layout + note map (Alesis Nitro Max defaults; GM-compatible) ----
@@ -108,6 +133,7 @@ function hit(note, vel) {
   if (!m) { console.log("unmapped note", note, vel); return; }
   const [id, part] = m;
   const p = parts[id];
+  recordHit(id);
   const v = Math.max(0.3, Math.min(1, Math.sqrt(vel / 100)));   // sqrt curve: low-sensitivity pads still flash
   if (part === "rim") { flash(p.rim, v); flash(p.glow, v * 0.45); }
   else if (part === "bell") { flash(p.bell, v); flash(p.glow, v * 0.5, FADE_MS * 1.6); }
@@ -118,6 +144,58 @@ function hit(note, vel) {
   p.pop.getAnimations().forEach(a => a.cancel());
   p.pop.animate([{ transform: `scale(${1 + 0.06 * v})` }, { transform: "scale(1)" }],
                 { duration: 160, easing: "ease-out" });
+}
+
+// ---- Session stats: rolling APM (hits/min) + per-piece counts ----
+// A session starts at the first hit; refreshing the browser source resets it.
+const STATS = params.get("stats") !== "0";
+const APM_WINDOW_S = Number(params.get("window") || 5);
+const counts = {}, countEls = {};
+const recent = [];   // hit timestamps inside the APM window
+let sessionStart = null, peakApm = 0, total = 0;
+
+if (STATS) {
+  document.body.classList.add("with-stats");
+  document.getElementById("stats").hidden = false;
+  const box = document.getElementById("counts");
+  const addCount = (key, label, color, cls = "") => {
+    const c = document.createElement("div");
+    c.className = "count " + cls;
+    c.style.setProperty("--c", color);
+    c.innerHTML = `<i></i>${label}<b>0</b>`;
+    box.appendChild(c);
+    countEls[key] = c.querySelector("b");
+  };
+  for (const id of ["kick", "snare", "hihat", "hhpedal", "tom1", "tom2", "tom3", "crash", "ride"]) {
+    const [, label, , , , color] = PIECES.find(pc => pc[0] === id);
+    addCount(id, label, color);
+  }
+  addCount("total", "Total", "#ffffff", "total");
+  setInterval(renderStats, 100);
+}
+
+function recordHit(id) {
+  if (!STATS) return;
+  const now = performance.now();
+  sessionStart ??= now;
+  recent.push(now);
+  counts[id] = (counts[id] || 0) + 1;
+  countEls[id].textContent = counts[id];
+  countEls.total.textContent = ++total;
+}
+
+function renderStats() {
+  const now = performance.now();
+  while (recent.length && now - recent[0] > APM_WINDOW_S * 1000) recent.shift();
+  const apm = Math.round(recent.length * 60 / APM_WINDOW_S);
+  peakApm = Math.max(peakApm, apm);
+  document.getElementById("apm").textContent = apm;
+  document.getElementById("peak").textContent = peakApm;
+  if (sessionStart !== null) {
+    const sec = Math.floor((now - sessionStart) / 1000);
+    document.getElementById("clock").textContent =
+      `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`;
+  }
 }
 
 function setStatus(s) {
