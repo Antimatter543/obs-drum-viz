@@ -1,4 +1,4 @@
-# drum-viz
+# obs-drum-viz
 
 A live e-drum kit overlay for OBS. Each pad lights up when you hit it, brighter the harder you hit. A strip along the bottom shows your APM (hits per minute) and how many times you've hit each piece this session.
 
@@ -20,8 +20,8 @@ Linux only, because it uses the ALSA sequencer. You need `aseqdump` and `stdbuf`
 ## Setup
 
 ```sh
-git clone https://github.com/Antimatter543/drum-viz ~/Projects/drum-viz
-cd ~/Projects/drum-viz
+git clone https://github.com/Antimatter543/obs-drum-viz ~/Projects/obs-drum-viz
+cd ~/Projects/obs-drum-viz
 python3 server.py            # serves http://127.0.0.1:7870
 ```
 
@@ -32,7 +32,7 @@ cp drum-viz.service ~/.config/systemd/user/
 systemctl --user enable --now drum-viz
 ```
 
-The unit file assumes the repo lives at `~/Projects/drum-viz`. If yours is somewhere else, edit the `ExecStart` line.
+The unit file assumes the repo lives at `~/Projects/obs-drum-viz`. If yours is somewhere else, edit the `ExecStart` line.
 
 ### OBS
 

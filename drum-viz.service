@@ -3,7 +3,7 @@ Description=Drum Viz - e-drum MIDI to OBS overlay bridge
 After=sound.target
 
 [Service]
-ExecStart=/usr/bin/python3 %h/Projects/drum-viz/server.py
+ExecStart=/usr/bin/python3 %h/Projects/obs-drum-viz/server.py
 Restart=on-failure
 RestartSec=3
 
