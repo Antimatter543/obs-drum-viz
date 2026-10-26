@@ -47,7 +47,7 @@ const PIECES = [
   ["hhpedal","HH Pedal",105, 410, 26, "#ffe08a"],
 ];
 
-// note -> [piece, part]   part: "head" | "rim" | "bell" | "open"
+// note -> [piece, part]   part: "head" | "rim" | "bell" | "half" | "open"
 const NOTES = {
   35: ["kick", "head"], 36: ["kick", "head"],
   38: ["snare", "head"], 37: ["snare", "rim"], 40: ["snare", "rim"],
@@ -55,7 +55,8 @@ const NOTES = {
   45: ["tom2", "head"], 47: ["tom2", "rim"],
   43: ["tom3", "head"], 58: ["tom3", "rim"], 41: ["tom3", "head"],
   42: ["hihat", "head"], 22: ["hihat", "rim"], 46: ["hihat", "open"], 26: ["hihat", "open"],
-  44: ["hhpedal", "head"],
+  44: ["hhpedal", "head"], 21: ["hhpedal", "head"],          // 21 = foot splash
+  23: ["hihat", "half"],                                    // half-open
   49: ["crash", "head"], 55: ["crash", "rim"], 57: ["crash", "head"], 52: ["crash", "head"],
   51: ["ride", "head"], 59: ["ride", "rim"], 53: ["ride", "bell"],
 };
@@ -112,6 +113,7 @@ function hit(note, vel) {
   else if (part === "bell") { flash(p.bell, v); flash(p.glow, v * 0.5, FADE_MS * 1.6); }
   else flash(p.glow, v, ["crash", "ride"].includes(id) || part === "open" ? FADE_MS * 1.8 : FADE_MS);
   if (part === "open") flash(p.rim, v, FADE_MS * 1.8);
+  if (part === "half") flash(p.rim, v * 0.5, FADE_MS * 1.3);
   flash(p.bloom, v * 0.8, FADE_MS * 1.3);
   p.pop.getAnimations().forEach(a => a.cancel());
   p.pop.animate([{ transform: `scale(${1 + 0.06 * v})` }, { transform: "scale(1)" }],

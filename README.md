@@ -68,7 +68,8 @@ These are the Nitro Max defaults, which mostly match the GM drum map. To change 
 | Kick | 35, 36 |
 | Snare (head / rim) | 38 / 37, 40 |
 | Tom 1 / 2 / Floor | 48 / 45 / 43 (rims 50 / 47 / 58) |
-| Hi-hat closed / open / pedal | 42 / 46 / 44 |
+| Hi-hat closed / half-open / open | 42 / 23 / 46 (edges 22 / 26) |
+| Hi-hat pedal / foot splash | 44 / 21 |
 | Crash | 49, 55, 57, 52 |
 | Ride (bow / edge / bell) | 51 / 59 / 53 |
 
