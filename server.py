@@ -59,6 +59,15 @@ def find_port() -> tuple[str, str] | None:
     return None
 
 
+def watch_port(proc: subprocess.Popen, port: str) -> None:
+    while proc.poll() is None:
+        time.sleep(2)
+        found = find_port()
+        if not found or found[0] != port:
+            proc.terminate()
+            return
+
+
 def midi_loop() -> None:
     while True:
         found = find_port()
@@ -71,6 +80,9 @@ def midi_loop() -> None:
         proc = subprocess.Popen(["stdbuf", "-oL", "aseqdump", "-p", port],
                                 stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
         set_status(True, name)
+        # aseqdump keeps running when the kit is unplugged, so a replug would
+        # leave it on a dead subscription. Kill it once the port is gone.
+        threading.Thread(target=watch_port, args=(proc, port), daemon=True).start()
         for line in proc.stdout:
             if m := NOTE_ON.search(line):
                 ch, note, vel = map(int, m.groups())
