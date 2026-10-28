@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Drum Stats</title>
+<style>
+  :root { --panel: rgba(255, 255, 255, 0.035); --line: rgba(255, 255, 255, 0.08);
+          --dim: rgba(255, 255, 255, 0.55); --accent: #ffcf5a; }
+  html { background: #0b0d12; color: #fff; }
+  body { margin: 0 auto; max-width: 980px; padding: 28px 16px 48px;
+         font-family: "Inter", "Segoe UI", system-ui, sans-serif; font-variant-numeric: tabular-nums; }
+  h1 { font-size: 22px; font-weight: 800; letter-spacing: -0.01em; margin: 0 0 18px; }
+  h1 small { font-size: 13px; font-weight: 600; color: var(--dim); margin-left: 10px; letter-spacing: 0; }
+  h2 { font-size: 12px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--dim); margin: 0 0 12px; }
+  section { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 18px 20px; margin-bottom: 16px; }
+
+  #tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 16px; }
+  .tile b { display: block; font-size: 30px; font-weight: 800; letter-spacing: -0.02em; line-height: 1.1; }
+  .tile span { font-size: 12px; color: var(--dim); }
+  .tile:first-child b { color: var(--accent); }
+
+  .bar-row { display: grid; grid-template-columns: 90px 1fr 120px; align-items: center; gap: 12px; font-size: 13px; padding: 3px 0; }
+  .bar-row .name { display: flex; align-items: center; gap: 7px; color: rgba(255, 255, 255, 0.75); }
+  .bar-row i { width: 9px; height: 9px; border-radius: 50%; background: var(--c); flex: none; }
+  .bar-row .track { height: 10px; border-radius: 5px; background: rgba(255, 255, 255, 0.05); overflow: hidden; }
+  .bar-row .fill { height: 100%; border-radius: 5px; background: var(--c); }
+  .bar-row .num { text-align: right; font-weight: 700; }
+  .bar-row .num small { color: var(--dim); font-weight: 500; margin-left: 6px; }
+
+  #days { display: flex; align-items: flex-end; gap: 2px; height: 120px; }
+  #days div { flex: 1; min-width: 0; border-radius: 2px 2px 0 0; background: var(--accent); }
+  #days div.zero { background: rgba(255, 255, 255, 0.06); height: 2px; }
+  #days div.today { outline: 1px solid rgba(255, 255, 255, 0.5); outline-offset: 1px; }
+  #day-axis { display: flex; justify-content: space-between; font-size: 11px; color: var(--dim); margin-top: 6px; }
+
+  .scroll { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+       color: var(--dim); padding: 0 10px 8px; border-bottom: 1px solid var(--line); }
+  td { padding: 7px 10px; border-bottom: 1px solid rgba(255, 255, 255, 0.04); white-space: nowrap; }
+  th.r, td.r { text-align: right; }
+  td .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--c); margin-right: 7px; }
+  tr.live td:first-child::after { content: "live"; margin-left: 8px; font-size: 10px; font-weight: 700; letter-spacing: 0.1em;
+       text-transform: uppercase; color: #0b0d12; background: #5affa0; border-radius: 4px; padding: 1px 5px; }
+  .empty { color: var(--dim); font-size: 13px; }
+  #error { color: #ff5a7a; font-size: 13px; }
+</style>
+</head>
+<body>
+<h1>Drum stats <small id="updated"></small></h1>
+<div id="error"></div>
+
+<section><div id="tiles"></div></section>
+
+<section>
+  <h2>All-time by piece</h2>
+  <div id="pieces"></div>
+</section>
+
+<section>
+  <h2>Hits per day · last 8 weeks</h2>
+  <div id="days"></div>
+  <div id="day-axis"></div>
+</section>
+
+<section>
+  <h2>Sessions</h2>
+  <div class="scroll"><table>
+    <thead><tr><th>Date</th><th class="r">Duration</th><th class="r">Hits</th><th class="r">Peak APM</th><th>Top piece</th></tr></thead>
+    <tbody id="sessions"></tbody>
+  </table></div>
+</section>
+
+<script src="kit.js"></script>
+<script>
+const DAYS = 56;
+const piece = Object.fromEntries(PIECES.map(([id, label, , , , color]) => [id, { label, color }]));
+const fmt = n => Math.round(n).toLocaleString("en-US");
+const esc = s => String(s).replace(/[&<>"]/g, c => `&#${c.charCodeAt(0)};`);
+
+function dur(sec) {
+  sec = Math.round(sec);
+  const h = Math.floor(sec / 3600), m = Math.floor(sec / 60) % 60, s = sec % 60;
+  return h ? `${h}h ${String(m).padStart(2, "0")}m` : `${m}:${String(s).padStart(2, "0")}`;
+}
+const localDate = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+function render(s) {
+  const a = s.alltime;
+  const best = Math.max(0, ...s.sessions.map(x => x.peak_apm || 0));
+  document.getElementById("tiles").innerHTML = [
+    [fmt(a.hits), "all-time hits"], [fmt(a.sessions), "sessions"], [dur(a.seconds), "time played"],
+    [a.seconds > 0 ? fmt(a.hits / (a.seconds / 60)) : "–", "avg hits / min played"],
+    [fmt(best), "best peak APM (last 100)"],
+  ].map(([v, l]) => `<div class="tile"><b>${v}</b><span>${l}</span></div>`).join("");
+
+  // Per piece, biggest first
+  const pc = pieceCounts(a.notes);
+  const sum = Object.values(pc).reduce((x, y) => x + y, 0);
+  const max = Math.max(1, ...Object.values(pc));
+  document.getElementById("pieces").innerHTML = sum ? PIECE_ORDER
+    .map(id => [id, pc[id] || 0]).sort((x, y) => y[1] - x[1])
+    .map(([id, n]) => `<div class="bar-row" style="--c:${piece[id].color}">
+        <span class="name"><i></i>${piece[id].label}</span>
+        <span class="track"><span class="fill" style="display:block;width:${(n / max * 100).toFixed(1)}%"></span></span>
+        <span class="num">${fmt(n)}<small>${(n / sum * 100).toFixed(1)}%</small></span></div>`).join("")
+    : `<div class="empty">No hits logged yet.</div>`;
+
+  // Hits per day, zero-filled
+  const byDay = Object.fromEntries(s.days.map(d => [d.date, d]));
+  const today = new Date(); today.setHours(12, 0, 0, 0);
+  const days = [];
+  for (let i = DAYS - 1; i >= 0; i--) {
+    const d = new Date(today); d.setDate(today.getDate() - i);
+    const key = localDate(d);
+    days.push({ key, d, hits: byDay[key]?.hits || 0, seconds: byDay[key]?.seconds || 0 });
+  }
+  const dmax = Math.max(1, ...days.map(d => d.hits));
+  document.getElementById("days").innerHTML = days.map((d, i) =>
+    `<div class="${d.hits ? "" : "zero"}${i === DAYS - 1 ? " today" : ""}"
+          ${d.hits ? `style="height:${Math.max(2, d.hits / dmax * 100).toFixed(1)}%"` : ""}
+          title="${d.d.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" })}: ${fmt(d.hits)} hits, ${dur(d.seconds)}"></div>`).join("");
+  const label = d => d.toLocaleDateString(undefined, { day: "numeric", month: "short" });
+  document.getElementById("day-axis").innerHTML =
+    [0, 14, 28, 42, DAYS - 1].map(i => `<span>${i === DAYS - 1 ? "today" : label(days[i].d)}</span>`).join("");
+
+  // Sessions, newest first
+  const liveId = s.current?.id;
+  document.getElementById("sessions").innerHTML = s.sessions.length ? s.sessions.map(x => {
+    const top = Object.entries(pieceCounts(x.notes)).sort((p, q) => q[1] - p[1])[0];
+    const when = new Date(x.start * 1000).toLocaleString(undefined,
+      { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+    return `<tr class="${x.id === liveId ? "live" : ""}"><td>${esc(when)}</td><td class="r">${dur(x.duration)}</td>
+      <td class="r">${fmt(x.hits)}</td><td class="r">${x.peak_apm ?? "–"}</td>
+      <td>${top ? `<span class="dot" style="--c:${piece[top[0]].color}"></span>${piece[top[0]].label}` : "–"}</td></tr>`;
+  }).join("") : `<tr><td colspan="5" class="empty">No sessions yet.</td></tr>`;
+
+  document.getElementById("updated").textContent = "updated " + new Date().toLocaleTimeString();
+}
+
+async function load() {
+  try {
+    render(await (await fetch("/api/stats", { cache: "no-store" })).json());
+    document.getElementById("error").textContent = "";
+  } catch (err) {
+    document.getElementById("error").textContent = "Couldn't load /api/stats: " + err;
+  }
+}
+load();
+setInterval(load, 15000);
+</script>
+</body>
+</html>
